@@ -28,6 +28,7 @@ aws kms encrypt --key-id $KMS_KEY_ID --plaintext fileb://<(echo -n $KEY) --query
 ```
 for i in k8s.key.pem k8s.cert.pem k8s.ca.pem helm.key.pem helm.cert.pem helm.ca.pem ; do
   cat $i | gpg --batch --passphrase-file <(echo -n $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
+done
 ```
 
 **Store those encrypted certificates and the encrypted key in a directory somewhere**
