@@ -18,16 +18,16 @@ This image will get the GPG key from AWS KMS at start up and then decrypt-and-im
 
 (We do this in terraform, you might do it in the console or cli)
 
-**Generate a key and store it in KMS:**
+**Generate a key and encrypt it with KMS:**
 ```
 KEY=$(aws kms generate-random --number-of-bytes 128 | jq .Plaintext | tr -d \")
-aws kms encrypt --key-id $KMS_KEY_ID --plaintext fileb://<(echo $KEY) --query CiphertextBlob --output text | base64 -d >kms.key
+aws kms encrypt --key-id $KMS_KEY_ID --plaintext fileb://<(echo -n $KEY) --query CiphertextBlob --output text | base64 -d >kms.key
 ```
 
 **Encrypt your certificates:**
 ```
 for i in k8s.key.pem k8s.cert.pem k8s.ca.pem helm.key.pem helm.cert.pem helm.ca.pem ; do
-  cat $i | gpg --batch --passphrase-file <(echo $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
+  cat $i | gpg --batch --passphrase-file <(echo -n $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
 ```
 
 **Store those encrypted certificates and the encrypted key in a directory somewhere**
