@@ -2,6 +2,12 @@
 
 ----
 
+(Forked from https://github.com/mf-lit/helm-ci)
+
+11/07/18 mf - Added qa-housekeeper script
+
+----
+
 A docker image for running helm/kubectl with certificates encrypted using AWS KMS
 
 We deploy to kubernetes from our CircleCI pipeline and needed a way to allow helm (and kubectl) to run in that pipeline but keeping our k8s and helm certificates secure.
