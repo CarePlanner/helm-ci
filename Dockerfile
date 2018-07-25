@@ -15,7 +15,7 @@ ADD https://storage.googleapis.com/kubernetes-helm/helm-v$HELM_VERSION-linux-amd
 #ADD helm-binary /usr/bin/helm
 ADD https://github.com/mozilla/sops/releases/download/$SOPS_VERSION/sops-$SOPS_VERSION.linux /usr/bin/sops
 
-COPY entrypoint.sh /usr/bin/entrypoint.sh
+COPY scripts/* /usr/bin/
 
 RUN tar -zxf /tmp/helm.tgz linux-amd64/helm --strip-components 1 -C /usr/bin && \
     rm -f /tmp/helm.tgz && \
