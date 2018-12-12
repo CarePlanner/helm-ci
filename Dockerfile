@@ -1,9 +1,9 @@
 FROM alpine:3.7
 
-ENV HELM_VERSION 2.8.2
+ENV HELM_VERSION 2.11.0
 ENV KUBECTL_VERSION 1.10.2
 ENV SOPS_VERSION 3.0.5
-ENV HELM_S3_PLUGIN_VERSION 0.6.1
+ENV HELM_S3_PLUGIN_VERSION 0.7.0
 
 # git branch lookup in circleci job requires: jq openssh-client git
 # date parsing in qa_housekeeper requires: coreutils
