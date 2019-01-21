@@ -5,6 +5,7 @@
 (Forked from https://github.com/mf-lit/helm-ci)
 
 11/07/18 mf - Added qa-housekeeper script
+15/01/19 mf - Added EKS support
 
 ----
 
@@ -15,6 +16,8 @@ We deploy to kubernetes from our CircleCI pipeline and needed a way to allow hel
 We encrypt the certificates using envelope encryption - the certificates are encrypted with GPG which uses a key stored in AWS KMS. This means we can safely store the certificates in the repo alongside our code.
 
 This image will get the GPG key from AWS KMS at start up and then decrypt-and-import the certificates ready for use by helm/kubectl, the docker image just needs to be passed a set of IAM keys.
+
+EKS using eks-iam-authenticator is supported, indeed it is the default over using k8s certificates (but certificates are still required for helm)
 
 ----
 
@@ -33,7 +36,7 @@ aws kms encrypt --key-id $KMS_KEY_ID --plaintext fileb://<(echo -n $KEY) --query
 **Encrypt your certificates:**
 ```
 for i in k8s.key.pem k8s.cert.pem k8s.ca.pem helm.key.pem helm.cert.pem helm.ca.pem ; do
-  cat $i | gpg --batch --passphrase-file <(echo -n $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
+  [ -f $i ] && cat $i | gpg --batch --passphrase-file <(echo -n $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
 done
 ```
 
@@ -54,7 +57,12 @@ The docker image needs to be passed several environment variables:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `K8S_CLUSTER_NAME`
-- `K8S_NAMESPACE`
+- `TILLER_NAMESPACE` (Optional - only if tiller isn't running in the kube-system namespace)
+
+Optional (required if you are using certs instead of IAM to authenticate to kubernetes)
+
+- `K8S_CLUSTER_API` (address of the API endpoint)
+- `K8S_NAMESPACE` (a default context will be created, pointing at this namespace)
 - `K8S_USER`
 
 Optional (required if you use the excellent [helm s3 plugin](https://github.com/hypnoglow/helm-s3))
@@ -87,7 +95,6 @@ docker run -it \
 -e HELM_REPO=my-helm-repo \
 -e HELM_REPO_URL="s3://somebucket/charts" \
 -v /home/circleci/project/build/helm/dev/certs:/encrypted_certs.d \
--v /home/circleci/project/build/helm/dev/values:/helm.d \
 myregistry/helm-ci \
 helm list --tls
 ```
