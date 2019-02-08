@@ -17,8 +17,9 @@ if [ -z $SKIP_CERT_IMPORT ] ; then
   [ -z $ENCRYPTED_CERTS_DIR ] && ENCRYPTED_CERTS_DIR="/encrypted_certs.d"
   [ -d $ENCRYPTED_CERTS_DIR ] || error_exit "Could not find $ENCRYPTED_CERTS_DIR"
 
-  [ -e "${ENCRYPTED_CERTS_DIR}/kms.key" ] || error_exit "Could not find ${ENCRYPTED_CERTS_DIR}/kms.key"
-  KEY=$(aws kms decrypt --ciphertext-blob fileb://${ENCRYPTED_CERTS_DIR}/kms.key --output text --query Plaintext | base64 -d)
+  [ -z $KMS_KEY_FILE ] && KMS_KEY_FILE="kms.key" 
+  [ -e "${ENCRYPTED_CERTS_DIR}/${KMS_KEY_FILE}" ] || error_exit "Could not find ${ENCRYPTED_CERTS_DIR}/${KMS_KEY_FILE}"
+  KEY=$(aws kms decrypt --ciphertext-blob fileb://${ENCRYPTED_CERTS_DIR}/${KMS_KEY_FILE} --output text --query Plaintext | base64 -d)
 
   # Kubectl setup, prefer EKS-IAM but fallback to K8S certs
   if aws eks describe-cluster --name $K8S_CLUSTER_NAME >/dev/null 2>&1 ; then
