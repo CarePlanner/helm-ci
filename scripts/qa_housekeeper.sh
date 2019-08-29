@@ -18,7 +18,7 @@ while read -r DEPLOYMENT ; do
   fi
 
   #Remove deployments with a closed PR
-  if [[ $HELM_RELEASE =~ ^qa ]] && [[ -n $GITHUB_OAUTH_TOKEN ]] && [[ $PR =~ ^[0-9]+$ ]] ; then
+  if [[ $HELM_RELEASE =~ ^qa ]] && [[ ! $HELM_RELEASE =~ -release-20 ]] && [[ -n $GITHUB_OAUTH_TOKEN ]] && [[ $PR =~ ^[0-9]+$ ]] ; then
     PR_STATUS=$(curl -s -H "Authorization: token ${GITHUB_OAUTH_TOKEN}" 'https://api.github.com/repos/CarePlanner/careplanner/pulls/${PR}' | jq -r .state)
     if [[ "$PR_STATUS" == "closed" ]] ; then
       echo "Purging $HELM_RELEASE (PR ${PR} is closed)..."
