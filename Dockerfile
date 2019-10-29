@@ -1,7 +1,7 @@
 FROM alpine:3.7
 
-ENV HELM_VERSION 2.12.1
-ENV KUBECTL_VERSION 1.13.2
+ENV HELM_VERSION 2.15.1
+ENV KUBECTL_VERSION 1.14.8
 ENV AWS_IAM_AUTHENTICATOR_VERSION 1.11.5/2018-12-06
 ENV SOPS_VERSION 3.0.5
 ENV HELM_S3_PLUGIN_VERSION 0.7.0
@@ -10,7 +10,9 @@ ENV HELM_S3_PLUGIN_VERSION 0.7.0
 # date parsing in qa_housekeeper requires: coreutils
 RUN apk update && \
     apk add gnupg py2-pip bash git make curl jq openssh-client git coreutils && \
-    pip install awscli
+    pip install awscli && \
+    apk --purge -v del py-pip && \
+    rm -rf /var/cache/apk/*
 
 ADD https://storage.googleapis.com/kubernetes-release/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl /usr/bin/kubectl
 #ADD kubectl /usr/bin/kubectl
