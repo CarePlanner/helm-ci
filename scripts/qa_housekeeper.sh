@@ -2,18 +2,20 @@
 CURRENT_DATE=$(date +%s)
 MAX_AGE=1209600 #14 days
 
-[ -z $TILLER_NAMESPACE ] && export TILLER_NAMESPACE="services"
+#QA Housekeeper runs from within a pod, so we don't want the aws-iam-authenticator kubeconfig that was pre-created by the entrypoint
+[ -e $HOME/.kube/config ] && rm -f $HOME/.kube/config
+
 while read -r DEPLOYMENT ; do
 
   HELM_RELEASE=$(echo $DEPLOYMENT | awk '{print $1}')
-  LAST_UPDATED=$(date --date="$(echo $DEPLOYMENT| awk '{print $3" "$4" "$5" "$6" "$7}')" +%s)
+  LAST_UPDATED=$(date --date="$(echo $DEPLOYMENT| awk '{print $4"T"$5$6}')" +%s)
   AGE=$(( $CURRENT_DATE - $LAST_UPDATED ))
   PR=$(echo $HELM_RELEASE | awk -F- '{print $NF}')
 
   # Remove deployments older than MAX_AGE
   if [[ $AGE -gt $MAX_AGE ]] ; then
     echo "Purging $HELM_RELEASE (age ${AGE}s)..."
-    helm del --purge "$HELM_RELEASE" --tls
+    helm uninstall "$HELM_RELEASE" --namespace qa
     continue
   fi
 
@@ -22,14 +24,14 @@ while read -r DEPLOYMENT ; do
     PR_STATUS=$(curl -s -H "Authorization: token ${GITHUB_OAUTH_TOKEN}" 'https://api.github.com/repos/CarePlanner/careplanner/pulls/${PR}' | jq -r .state)
     if [[ "$PR_STATUS" == "closed" ]] ; then
       echo "Purging $HELM_RELEASE (PR ${PR} is closed)..."
-      helm del --purge "$HELM_RELEASE" --tls
+      helm uninstall "$HELM_RELEASE"  --namespace qa
       continue
     fi
   fi
 
   echo "Skipping $HELM_RELEASE (Age: ${AGE}s)"
 
-done <<< "$(helm list --tls | grep 'cpweb-qa')"
+done <<< "$(helm list --namespace qa | grep 'cpweb-qa')"
 echo "Complete."
 
 
