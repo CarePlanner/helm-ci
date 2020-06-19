@@ -2,7 +2,7 @@
 CURRENT_DATE=$(date +%s)
 MAX_AGE=1209600 #14 days
 
-#QA Housekeeper runs from within a pod, so we don't want the aws-iam-authenticator kubeconfig that was pre-created by the entrypoint
+#QA Housekeeper runs from within a pod, so we don't want any aws-iam-authenticator kubeconfig that was pre-created by the entrypoint
 [ -e $HOME/.kube/config ] && rm -f $HOME/.kube/config
 
 while read -r DEPLOYMENT ; do

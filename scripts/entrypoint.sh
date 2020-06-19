@@ -7,6 +7,6 @@ function error_exit
 }
 
 # Kubectl setup
-aws eks update-kubeconfig --name $K8S_CLUSTER_NAME 1>/dev/null
+[ "$SKIP_EKS_AUTH" == "true" ] || aws eks update-kubeconfig --name $K8S_CLUSTER_NAME 1>/dev/null
 
 exec "$@"
