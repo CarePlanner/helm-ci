@@ -1,120 +1,57 @@
 # Helm-CI
 
-----
-
 (Forked from https://github.com/mf-lit/helm-ci)
 
-11/07/18 mf - Added qa-housekeeper script
-15/01/19 mf - Added EKS support
-
-----
+## Introduction
 
 A docker image for running helm/kubectl with certificates encrypted using AWS KMS
 
-We deploy to kubernetes from our CircleCI pipeline and needed a way to allow helm (and kubectl) to run in that pipeline but keeping our k8s and helm certificates secure.
+We deploy to kubernetes from our CircleCI pipeline and needed a way to allow helm (and kubectl) to run in that pipeline.
 
-We encrypt the certificates using envelope encryption - the certificates are encrypted with GPG which uses a key stored in AWS KMS. This means we can safely store the certificates in the repo alongside our code.
+EKS using eks-iam-authenticator is supported
 
-This image will get the GPG key from AWS KMS at start up and then decrypt-and-import the certificates ready for use by helm/kubectl, the docker image just needs to be passed a set of IAM keys.
-
-EKS using eks-iam-authenticator is supported, indeed it is the default over using k8s certificates (but certificates are still required for helm)
-
+We also bundle the qa-housekeeper into this image
 ----
 
-### Prerequisites:
+## How to build
 
-**Create a KMS CMK and get it's ID.**
+There is no pipeline for this (deliberately as it's so simple).
 
-(We do this in terraform, you might do it in the console or cli)
+Edit the Dockerfile (choosing the versions of kubectl, helm and sops that you want to bundle in)
 
-**Generate a key and encrypt it with KMS:**
-```
-KEY=$(aws kms generate-random --number-of-bytes 128 | jq .Plaintext | tr -d \")
-aws kms encrypt --key-id $KMS_KEY_ID --plaintext fileb://<(echo -n $KEY) --query CiphertextBlob --output text | base64 -d >kms.key
-```
+kubectl version skew policy: https://kubernetes.io/docs/setup/release/version-skew-policy/
+helm version skew policy: https://helm.sh/docs/topics/version_skew/
 
-**Encrypt your certificates:**
-```
-for i in k8s.key.pem k8s.cert.pem k8s.ca.pem helm.key.pem helm.cert.pem helm.ca.pem ; do
-  [ -f $i ] && cat $i | gpg --batch --passphrase-file <(echo -n $KEY) --symmetric --cipher-algo AES256 >${i%.pem}.gpg
-done
-```
-
-**Store those encrypted certificates and the encrypted key in a directory somewhere**
-We keep them in our repo:
-```
-cp *.gpg kms.key /my/repo/certs/
-cd /my/repo
-git add certs
-git commit -m "Encrypted certs in the repo"
-```
-
-### Requirements:
-
-The docker image needs to be passed several environment variables:
-
-- `AWS_DEFAULT_REGION`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `K8S_CLUSTER_NAME`
-- `TILLER_NAMESPACE` (Optional - only if tiller isn't running in the kube-system namespace)
-
-Optional (required if you are using certs instead of IAM to authenticate to kubernetes)
-
-- `K8S_CLUSTER_API` (address of the API endpoint)
-- `K8S_NAMESPACE` (a default context will be created, pointing at this namespace)
-- `K8S_USER`
-
-Optional (required if you use the excellent [helm s3 plugin](https://github.com/hypnoglow/helm-s3))
-
-- `HELM_REPO`
-- `HELM_REPO_URL`
-
-The encryted certs directory needs to be mounted into the docker container as volume, e.g:
-
-`-v /my/repo/certs:/encrypts_certs.d`
-
-If you want to pass in helm values as yaml files, this needs to be mounted too, e.g:
-
-`-v /my/repo/helm/values:/helm.d`
-
-### Examples:
-
-Here's an example of using the image to list all helm deployments:
+Build and push the docker image:
 
 ```
-docker build -t myregistry/helm-ci
-
-docker run -it \
--e AWS_DEFAULT_REGION=eu-west-1 \
--e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
--e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
--e K8S_CLUSTER_NAME=k8s.somewhere.com \
--e K8S_NAMESPACE=dev \
--e K8S_USER=circleci \
--e HELM_REPO=my-helm-repo \
--e HELM_REPO_URL="s3://somebucket/charts" \
--v /home/circleci/project/build/helm/dev/certs:/encrypted_certs.d \
-myregistry/helm-ci \
-helm list --tls
+docker build -t 310555233936.dkr.ecr.eu-west-1.amazonaws.com/helm-ci:<tag> .
+ecrlogin
+docker push 310555233936.dkr.ecr.eu-west-1.amazonaws.com/helm-ci:<tag>
 ```
 
-Here's an example of using the image to upgrade a helm deployment:
+All our pipelines will pull the default `latest` tag of the image. So once you push that tag, you are effectively putting the image into production everywhere (which is great!)
 
-```
-docker build -t myregistry/helm-ci
+If you want to test it in a pipeline first, create a version tag (e.g. 310555233936.dkr.ecr.eu-west-1.amazonaws.com/helm-ci:3.0.2) and then temporarily modify a pipeline to use that tag. Once you've tested you can then tag and push `latest`
 
-docker run -it \
--e AWS_DEFAULT_REGION=eu-west-1 \
--e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
--e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
--e K8S_CLUSTER_NAME=k8s.somewhere.com \
--e K8S_NAMESPACE=dev \
--e K8S_USER=circleci \
--e HELM_REPO=my-helm-repo \
--e HELM_REPO_URL="s3://somebucket/charts" \
--v /home/circleci/project/build/helm/dev/certs:/encrypted_certs.d \
--v /home/circleci/project/build/helm/dev/values:/helm.d \
-myregistry/helm-ci \
-helm upgrade dev-myhelmapp my-helm-repo/myhelmchart -f /helm.d/myvalues.yaml --tls --debug
-```
+## Included scripts
+
+`entrypoint.sh`
+A simple docker entrypoint script, it sets up EKS authentication and then passes through the docker command. That's it (it used to be a lot more complicated in the Helm 2 days)
+
+`helm3-bc.sh`
+This is a wrapper script, symlinked to /usr/bin/helm.
+
+Most of our pipelines used helm2 originally, which required the `--tls` switch. The `--tls` switch was deprecated in helm3, so this script strips it out if it exists, and then passes all remaining arguments to /usr/bin/helm3. Once all our pipelines are updated, this script will no longer be needed.
+
+`qa-housekeeper.sh`
+The QA housekeeper is not needed for (and indeed has nothing to do with) our CI/CD pipelines, but it made sense to bundle it into this image.
+
+QA Housekeeper runs as a cronjob in the QA enviroment, deleting releases that haven't been built for N days or have had their Pull Request closed.
+
+See:
+
+https://github.com/CarePlanner/careplanner/blob/317650007f038500698aaa7b19337cdf0ff29f57/.circleci/config.yml#L252
+https://github.com/CarePlanner/confman/tree/master/helm/charts/qa-housekeeper
+https://github.com/CarePlanner/confman/blob/master/helm/deploy/qa/helmfile.d/qa-housekeeper.yaml
+
