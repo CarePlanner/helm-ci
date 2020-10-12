@@ -1,7 +1,7 @@
 FROM alpine:3.11
 
-ENV HELM_VERSION 3.2.1
-ENV KUBECTL_VERSION 1.15.2
+ENV HELM_VERSION 3.3.4
+ENV KUBECTL_VERSION 1.16.15
 ENV SOPS_VERSION 3.0.5
 
 # git branch lookup in circleci job requires: jq openssh-client git
